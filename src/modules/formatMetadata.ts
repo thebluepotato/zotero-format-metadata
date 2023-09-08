@@ -100,10 +100,12 @@ async function run(
         // this?: any;)
     },
 ) {
+    addon.data.lint.current.item = item;
     // todo: 将所有格式化字段函数都返回 item，统一保存一次，避免多次 SQL，提高效率。
     const args = [item, ...task.args];
     // await task.processor.apply(task.this, args);
     await task.processor(...args);
+    addon.data.lint.current = { item: null, dataFromAPI: {} };
 }
 
 async function runInBatch(
@@ -186,6 +188,6 @@ async function runInBatch(
         progress: 100,
         idx: 0,
     });
-    progress.startCloseTimer(5000);
+    !errNum ? progress.startCloseTimer(5000) : "";
     ztoolkit.log("batch tasks done");
 }

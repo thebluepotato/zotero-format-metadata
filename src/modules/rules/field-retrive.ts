@@ -1,5 +1,6 @@
 import { getString } from "../../utils/locale";
 import { progressWindow } from "../../utils/logger";
+import { CrossrefClient, QueryWorksParams } from "@jamesgopsill/crossref-client";
 
 export { updateMetadataByIdentifier };
 
@@ -9,7 +10,7 @@ export { updateMetadataByIdentifier };
  * @param item
  * @returns
  */
-async function translateByDOI(doi: string) {
+async function retriveMetadataFromTranslateByDOI(doi: string) {
     const identifier = {
         itemType: "journalArticle",
         DOI: doi,
@@ -28,6 +29,45 @@ async function translateByDOI(doi: string) {
     return newItem;
 }
 
+async function retriveMetadataFromCrossrefByDOI(doi: string) {
+    // const doi = await getDOI(item);
+    const client = new CrossrefClient();
+
+    const search: QueryWorksParams = {
+        query: "10.1002/adma.200600148",
+    };
+    const r = await client.works(search);
+    if (r.ok && r.status == 200) console.log(r.content);
+}
+
+async function getDOI(item: Zotero.Item) {
+    // 根据 DOI 从 doi.org
+    let doi = item.getField("DOI") as string;
+    // 不存在 DOI 直接结束
+    // todo: 若有附件，尝试从附件获取?
+    // todo: 弹出 DOI 输入对话框?
+    if (!doi) {
+        progressWindow(getString("info-noDOI"), "fail");
+        // return;
+    }
+
+    if (doi.match(/arxiv/gi)) {
+        const arxivID = doi.replace(/10.48550\/arXiv\./gi, "");
+        const updatedDOI = await getDOIFromArxiv(arxivID);
+        doi = updatedDOI !== false ? updatedDOI : doi;
+    }
+    return doi;
+}
+
+async function retriveMetadata(item: Zotero.Item) {
+    const doi = await getDOI(item);
+
+    addon.data.lint.current.dataFromAPI.doi = await retriveMetadataFromTranslateByDOI(doi);
+    // ztoolkit.log("Item retrieved from DOI: ", newItem);
+
+    // 从 crossref
+}
+
 async function updateMetadataByIdentifier(item: Zotero.Item, mode: "selected" | "blank" | "all" = "blank") {
     let doi = item.getField("DOI") as string;
     // 不存在 DOI 直接结束
@@ -44,7 +84,7 @@ async function updateMetadataByIdentifier(item: Zotero.Item, mode: "selected" | 
         doi = tmpDOI !== false ? tmpDOI : doi;
     }
 
-    const newItem = await translateByDOI(doi);
+    const newItem = await retriveMetadataFromTranslateByDOI(doi);
     ztoolkit.log("Item retrieved from DOI: ", newItem);
 
     const fields: Zotero.Item.ItemField[] = [
@@ -150,3 +190,17 @@ async function getDOIFromArxiv(arxivID: string) {
         return false;
     }
 }
+
+async function getDOIFromCrossrefByTitle(title: string) {
+    // const doi = await getDOI(item);
+    const client = new CrossrefClient();
+
+    const search: QueryWorksParams = {
+        queryTitle: title,
+    };
+    const r = await client.works(search);
+    if (r.ok && r.status == 200) console.log(r.content);
+}
+getDOIFromCrossrefByTitle(
+    "Thermodynamic stability, redox properties, and reactivity of Mn3O4, Fe3O4, and Co3O4 model catalysts for N2O decomposition: resolving the origins of steady turnover",
+);
